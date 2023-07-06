@@ -1,77 +1,128 @@
-const gameSpace = document.getElementById('game-space');
-const player = document.getElementById('player');
-const step = 10;
-let isMoving = false;
-const activeKeys = {};
+// Глобальные переменные
+var canvas;
+var canvasContext;
+var canvasWidth;
+var canvasHeight;
+var playerX;
+var playerY;
+var playerWidth = 50;
+var playerHeight = 50;
+var playerSpeed = 5; // Скорость движения игрока
+var playerVelocityX = 0; // Скорость перемещения по оси X
+var playerVelocityY = 0; // Скорость перемещения по оси Y
+var monsterX = 100;
+var monsterY = 100;
+var monsterWidth = 50;
+var monsterHeight = 50;
+var gameRunning = true;
 
+// Функция для установки размеров элементов
+function setElementSizes() {
+    canvasWidth = window.innerWidth;
+    canvasHeight = window.innerHeight;
+
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+
+    playerX = canvasWidth / 2;
+    playerY = canvasHeight / 2;
+}
+
+// Функция для движения игрока
 function movePlayer() {
-  const playerPos = player.getBoundingClientRect();
-  let moveX = 0;
-  let moveY = 0;
+    playerX += playerVelocityX;
+    playerY += playerVelocityY;
 
-  if (activeKeys['ArrowUp'] && playerPos.top > 0) {
-    moveY -= step;
-  }
-  if (activeKeys['ArrowDown'] && playerPos.bottom < window.innerHeight) {
-    moveY += step;
-  }
-  if (activeKeys['ArrowLeft'] && playerPos.left > 0) {
-    moveX -= step;
-  }
-  if (activeKeys['ArrowRight'] && playerPos.right < window.innerWidth) {
-    moveX += step;
-  }
-
-  player.style.top = playerPos.top + moveY + 'px';
-  player.style.left = playerPos.left + moveX + 'px';
-
-  const offsetX = (window.innerWidth - gameSpace.offsetWidth) / 2 - playerPos.left;
-  const offsetY = (window.innerHeight - gameSpace.offsetHeight) / 2 - playerPos.top;
-
-  gameSpace.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
-
-  if (isMoving) {
-    requestAnimationFrame(movePlayer);
-  }
-}
-
-document.addEventListener('keydown', (event) => {
-  const key = event.key;
-
-  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key) && !activeKeys[key]) {
-    activeKeys[key] = true;
-    isMoving = true;
-    movePlayer();
-  }
-});
-
-document.addEventListener('keyup', (event) => {
-  const key = event.key;
-
-  if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(key) && activeKeys[key]) {
-    delete activeKeys[key];
-    if (Object.keys(activeKeys).length === 0) {
-      isMoving = false;
+    // Ограничение движения игрока в пределах игрового поля
+    if (playerX < 0) {
+        playerX = 0;
+    } else if (playerX + playerWidth > canvasWidth) {
+        playerX = canvasWidth - playerWidth;
     }
-  }
-});
 
-function updateGameSpaceOffset() {
-  const playerRect = player.getBoundingClientRect();
-  const gameSpaceRect = gameSpace.getBoundingClientRect();
-
-  const playerCenterX = playerRect.left + playerRect.width / 2;
-  const playerCenterY = playerRect.top + playerRect.height / 2;
-
-  const gameSpaceCenterX = gameSpaceRect.left + gameSpaceRect.width / 2;
-  const gameSpaceCenterY = gameSpaceRect.top + gameSpaceRect.height / 2;
-
-  const gameSpaceOffsetX = playerCenterX - gameSpaceCenterX;
-  const gameSpaceOffsetY = playerCenterY - gameSpaceCenterY;
-
-  gameSpace.style.transform = `translate(${gameSpaceOffsetX}px, ${gameSpaceOffsetY}px)`;
+    if (playerY < 0) {
+        playerY = 0;
+    } else if (playerY + playerHeight > canvasHeight) {
+        playerY = canvasHeight - playerHeight;
+    }
 }
 
-window.addEventListener('resize', updateGameSpaceOffset);
+// Функция для обработки нажатия клавиш
+document.addEventListener("keydown", function(event) {
+    movePlayer(event.keyCode, true);
+});
+document.addEventListener("keyup", function(event) {
+    movePlayer(event.keyCode, false);
+});
 
-updateGameSpaceOffset();
+
+// Функция для обновления игры
+function updateGame() {
+    if (gameRunning) {
+        moveMonster();
+        checkCollision();
+        movePlayer();
+        drawEverything();
+    } else {
+        // Остановка игры
+        clearInterval();
+    }
+}
+
+// Функция для отрисовки игровых объектов
+function drawEverything() {
+    // Очистка холста
+    colorRect(0, 0, canvasWidth, canvasHeight, "black");
+
+    // Отрисовка игрока
+    colorRect(playerX, playerY, playerWidth, playerHeight, "blue");
+
+    // Отрисовка монстра
+    colorRect(monsterX, monsterY, monsterWidth, monsterHeight, "red");
+}
+
+// Функция для движения игрока
+function movePlayer() {
+    playerX += playerVelocityX;
+    playerY += playerVelocityY;
+
+    // Ограничение движения игрока в пределах игрового поля
+    if (playerX < 0) {
+        playerX = 0;
+    } else if (playerX + playerWidth > canvasWidth) {
+        playerX = canvasWidth - playerWidth;
+    }
+
+    if (playerY < 0) {
+        playerY = 0;
+    } else if (playerY + playerHeight > canvasHeight) {
+        playerY = canvasHeight - playerHeight;
+    }
+}
+
+// Функция для движения монстра к игроку
+function moveMonster() {
+    if (monsterX < playerX) {
+        monsterX += 2;
+    }
+    if (monsterX > playerX) {
+        monsterX -= 2;
+    }
+    if (monsterY < playerY) {
+        monsterY += 2;
+    }
+    if (monsterY > playerY) {
+        monsterY -= 2;
+    }
+}
+
+// Функция для проверки столкновения игрока с монстром
+function checkCollision() {
+    if (playerX < monsterX + monsterWidth &&
+        playerX + playerWidth > monsterX &&
+        playerY < monsterY + monsterHeight &&
+        playerY + playerHeight > monsterY) {
+        gameRunning = false;
+        alert("Игра окончена!");
+    }
+}

@@ -1,307 +1,175 @@
-// script.js
+// Глобальные переменные
+var canvas;
+var canvasContext;
+var canvasWidth;
+var canvasHeight;
+var playerX;
+var playerY;
+var playerWidth = 25;
+var playerHeight = 25;
+var playerSpeed = 5; // Скорость движения игрока
+var playerVelocityX = 0; // Скорость перемещения по оси X
+var playerVelocityY = 0; // Скорость перемещения по оси Y
+var monsterX = 100;
+var monsterY = 100;
+var monsterWidth = 20;
+var monsterHeight = 20;
+var gameRunning = true;
 
-document.addEventListener('DOMContentLoaded', () => {
-  const player = document.getElementById('player');
-  const bullets = [];
-  let canShoot = true;
-  let shootingInterval;
-  const bulletSpeed = 5; // Добавлено объявление переменной bulletSpeed
+// Функция для запуска игры
+window.onload = function() {
+    canvas = document.getElementById("gameCanvas");
+    canvasContext = canvas.getContext("2d");
 
-  const myButton = document.getElementById('my-button');
-  const constructorForm = document.getElementById('constructor-form');
-  const closeButton = document.getElementById('close-button');
+    // Установка размеров элементов при загрузке страницы
+    setElementSizes();
 
-  myButton.addEventListener('click', () => {
-    constructorForm.classList.remove('hidden');
-  });
+    // Установка интервала для обновления игры
+    setInterval(updateGame, 1000/30);
 
-  closeButton.addEventListener('click', () => {
-    constructorForm.classList.add('hidden');
-  });
+    // Обработчик изменения размера окна
+    window.addEventListener("resize", setElementSizes);
 
-  document.addEventListener('keydown', (event) => {
-    const key = event.key;
-    const playerPos = player.getBoundingClientRect();
+    // Обработчик нажатия клавиш
+    document.addEventListener("keydown", function(event) {
+        handleKeyPress(event.keyCode, true);
+    });
+    document.addEventListener("keyup", function(event) {
+        handleKeyPress(event.keyCode, false);
+    });
+}
 
-    if (key === ' ' && canShoot) {
-      shootBullet(playerPos);
-      shootingInterval = setInterval(() => {
-        shootBullet(player.getBoundingClientRect());
-      }, 100);
-      canShoot = false;
+// Функция для обновления игры
+function updateGame() {
+    if (gameRunning) {
+        movePlayer();
+        moveMonster();
+        checkCollision();
+        drawEverything();
+    } else {
+        // Остановка игры
+        clearInterval();
     }
-  });
+}
 
-  document.addEventListener('keyup', (event) => {
-    const key = event.key;
+// Функция для установки размеров элементов
+function setElementSizes() {
+    canvasWidth = window.innerWidth;
+    canvasHeight = window.innerHeight;
 
-    if (key === ' ' && !canShoot) {
-      clearInterval(shootingInterval);
-      canShoot = true;
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+
+    playerX = canvasWidth / 2;
+    playerY = canvasHeight / 2;
+}
+
+// Функция для обработки нажатия клавиш
+function handleKeyPress(keyCode, isKeyDown) {
+    // Вверх
+    if (keyCode === 87 || keyCode === 38) {
+        playerVelocityY = isKeyDown ? -1 : 0;
     }
-  });
-
-  function shootBullet(playerPos) {
-    const bullet = document.createElement('div');
-    bullet.classList.add('bullet');
-    bullet.style.top = playerPos.top + 15 + 'px';
-    bullet.style.left = playerPos.right + 'px';
-
-    const formula = document.getElementById('formula-input').value;
-    const startX = playerPos.right;
-    const startY = playerPos.top + 15;
-
-    bullet.dataset.x = startX.toString();
-    bullet.dataset.y = startY.toString();
-    bullet.dataset.formula = formula;
-
-    document.body.appendChild(bullet);
-    bullets.push(bullet);
-  }
-
-  function updateBullets() {
-    for (let i = bullets.length - 1; i >= 0; i--) {
-      const bullet = bullets[i];
-      const formula = bullet.dataset.formula;
-      const x = parseFloat(bullet.dataset.x);
-      const y = parseFloat(bullet.dataset.y);
-  
-      let newX;
-      let newY;
-  
-      if (formula) {
-        const playerPos = player.getBoundingClientRect();
-        const midY = playerPos.top + playerPos.height / 2;
-        const distanceFromMid = y - midY;
-        newX = x + bulletSpeed;
-        newY = calculateFormula(newX, formula) + midY + distanceFromMid;
-      } else {
-        newX = x + bulletSpeed;
-        newY = y;
-      }
-  
-      bullet.style.left = newX + 'px';
-      bullet.style.top = newY + 'px';
-  
-      bullet.dataset.x = newX.toString();
-      bullet.dataset.y = newY.toString();
-  
-      const bulletRect = bullet.getBoundingClientRect();
-      const screenWidth = window.innerWidth;
-  
-      if (bulletRect.right > screenWidth || bulletRect.left < 0) {
-        bullet.remove();
-        bullets.splice(i, 1);
-      }
+    // Вниз
+    else if (keyCode === 83 || keyCode === 40) {
+        playerVelocityY = isKeyDown ? 1 : 0;
     }
-  }
+    // Влево
+    else if (keyCode === 65 || keyCode === 37) {
+        playerVelocityX = isKeyDown ? -1 : 0;
+    }
+    // Вправо
+    else if (keyCode === 68 || keyCode === 39) {
+        playerVelocityX = isKeyDown ? 1 : 0;
+    }
+}
 
-  function calculateFormula(x, formula) {
-    const expression = new Function('x', 'return ' + formula);
-    return expression(x);
-  }
+// Функция для отрисовки игровых объектов
+function drawEverything() {
+    // Очистка холста
+    canvasContext.fillStyle = "black";
+    canvasContext.fillRect(0, 0, canvasWidth, canvasHeight);
 
-  function gameLoop() {
-    updateBullets();
-    requestAnimationFrame(gameLoop);
-  }
+    // Отрисовка игрока
+canvasContext.fillStyle = "blue";
+canvasContext.fillRect(playerX, playerY, playerWidth, playerHeight);
 
-  gameLoop();
-});
+// Отрисовка монстра, только если игра активна
+if (gameRunning) {
+    // Проверка расстояния между игроком и монстром
+    var distance = Math.sqrt(
+        Math.pow(playerX - monsterX, 2) + Math.pow(playerY - monsterY, 2)
+    );
+    var minDistance = 100; // Минимальное расстояние от игрока до монстра
 
+    if (distance > minDistance) {
+        canvasContext.fillStyle = "red";
+        canvasContext.fillRect(monsterX, monsterY, monsterWidth, monsterHeight);
+    }
+}
 
-
-
-// document.addEventListener('DOMContentLoaded', () => {
-//   const player = document.getElementById('player');
-//   const bullets = [];
-//   let canShoot = true;
-//   let shootingInterval;
-//   const bulletSpeed = 5; // Добавлено объявление переменной bulletSpeed
-
-//   const myButton = document.getElementById('my-button');
-//   const constructorForm = document.getElementById('constructor-form');
-//   const closeButton = document.getElementById('close-button');
-
-//   myButton.addEventListener('click', () => {
-//     constructorForm.classList.remove('hidden');
-//   });
-
-//   closeButton.addEventListener('click', () => {
-//     constructorForm.classList.add('hidden');
-//   });
-
-//   document.addEventListener('keydown', (event) => {
-//     const key = event.key;
-//     const playerPos = player.getBoundingClientRect();
-
-//     if (key === ' ' && canShoot) {
-//       shootBullet(playerPos);
-//       shootingInterval = setInterval(() => {
-//         shootBullet(player.getBoundingClientRect());
-//       }, 100);
-//       canShoot = false;
-//     }
-//   });
-
-//   document.addEventListener('keyup', (event) => {
-//     const key = event.key;
-
-//     if (key === ' ' && !canShoot) {
-//       clearInterval(shootingInterval);
-//       canShoot = true;
-//     }
-//   });
-
-//   function shootBullet(playerPos) {
-//     const bullet = document.createElement('div');
-//     bullet.classList.add('bullet');
-//     bullet.style.top = playerPos.top + 15 + 'px';
-//     bullet.style.left = playerPos.right + 'px';
-
-//     const formula = document.getElementById('formula-input').value;
-//     const startX = playerPos.right;
-//     const startY = playerPos.top + 15;
-
-//     bullet.dataset.x = startX.toString();
-//     bullet.dataset.y = startY.toString();
-//     bullet.dataset.formula = formula;
-
-//     document.body.appendChild(bullet);
-//     bullets.push(bullet);
-//   }
-
-//   function updateBullets() {
-//     for (let i = bullets.length - 1; i >= 0; i--) {
-//       const bullet = bullets[i];
-//       const formula = bullet.dataset.formula;
-//       const x = parseFloat(bullet.dataset.x);
-//       const y = parseFloat(bullet.dataset.y);
-
-//       const newX = x + bulletSpeed;
-//       const newY = calculateFormula(newX, formula);
-
-//       bullet.style.left = newX + 'px';
-//       bullet.style.top = newY + 'px';
-
-//       bullet.dataset.x = newX.toString();
-//       bullet.dataset.y = newY.toString();
-
-//       if (newX > window.innerWidth) {
-//         bullet.remove();
-//         bullets.splice(i, 1);
-//       }
-//     }
-//   }
-
-//   function calculateFormula(x, formula) {
-//     const expression = new Function('x', 'return ' + formula);
-//     return expression(x);
-//   }
-
-//   function gameLoop() {
-//     updateBullets();
-//     requestAnimationFrame(gameLoop);
-//   }
-
-//   gameLoop();
-// });
+// Отрисовка пуль
+drawBullets();
+}
 
 
+// Функция для обновления игры
+function updateGame() {
+    if (gameRunning) {
+        movePlayer();
+        moveMonster();
+        checkCollision();
+        updateBullets(); // Добавлено обновление пуль
+        drawEverything();
+        drawBullets(); // Добавлено отрисовка пуль
+    } else {
+        // Остановка игры
+        clearInterval();
+    }
+}
 
+// Функция для движения игрока
+function movePlayer() {
+    playerX += playerVelocityX * playerSpeed;
+    playerY += playerVelocityY * playerSpeed;
 
+    // Ограничение движения игрока в пределах игрового поля
+    if (playerX < 0) {
+        playerX = 0;
+    } else if (playerX + playerWidth > canvasWidth) {
+        playerX = canvasWidth - playerWidth;
+    }
 
+    if (playerY < 0) {
+        playerY = 0;
+    } else if (playerY + playerHeight > canvasHeight) {
+        playerY = canvasHeight - playerHeight;
+    }
+}
 
+// Функция для движения монстра к игроку
+function moveMonster() {
+    if (monsterX < playerX) {
+        monsterX += 2;
+    }
+    if (monsterX > playerX) {
+        monsterX -= 2;
+    }
+    if (monsterY < playerY) {
+        monsterY += 2;
+    }
+    if (monsterY > playerY) {
+        monsterY -= 2;
+    }
+}
 
-
-
-
-
-
-
-// document.addEventListener('DOMContentLoaded', () => {
-//     const player = document.getElementById('player');
-//     const bullets = [];
-//     let canShoot = true;
-//     let isMoving = false;
-//     let shootingInterval;
-  
-//     document.addEventListener('keydown', (event) => {
-//       const key = event.key;
-//       const playerPos = player.getBoundingClientRect();
-  
-//       if (key !== ' ' && !isMoving) {
-//         isMoving = true;
-//         movePlayer(key);
-//       }
-  
-//       if (key === ' ' && canShoot) { // Space key
-//         shootBullet(playerPos);
-//         shootingInterval = setInterval(() => {
-//           shootBullet(player.getBoundingClientRect());
-//         }, 100);
-//         canShoot = false;
-//       }
-//     });
-  
-//     document.addEventListener('keyup', (event) => {
-//       const key = event.key;
-//       if (key !== ' ') {
-//         isMoving = false;
-//       }
-  
-//       if (key === ' ' && !canShoot) {
-//         clearInterval(shootingInterval);
-//         canShoot = true;
-//       }
-//     });
-  
-//     function movePlayer(key) {
-//       const playerPos = player.getBoundingClientRect();
-//       const step = 10;
-  
-//       if (key === 'ArrowUp' && playerPos.top > 0) {
-//         player.style.top = playerPos.top - step + 'px';
-//       } else if (key === 'ArrowDown' && playerPos.bottom < window.innerHeight) {
-//         player.style.top = playerPos.top + step + 'px';
-//       } else if (key === 'ArrowLeft' && playerPos.left > 0) {
-//         player.style.left = playerPos.left - step + 'px';
-//       } else if (key === 'ArrowRight' && playerPos.right < window.innerWidth) {
-//         player.style.left = playerPos.left + step + 'px';
-//       }
-  
-//       if (isMoving) {
-//         requestAnimationFrame(() => movePlayer(key));
-//       }
-//     }
-  
-//     function shootBullet(playerPos) {
-//       const bullet = document.createElement('div');
-//       bullet.classList.add('bullet');
-//       bullet.style.top = playerPos.top + 15 + 'px';
-//       bullet.style.left = playerPos.right + 'px';
-//       document.body.appendChild(bullet);
-//       bullets.push(bullet);
-//     }
-  
-//     function updateBullets() {
-//       for (let i = bullets.length - 1; i >= 0; i--) {
-//         const bullet = bullets[i];
-//         const bulletPos = bullet.getBoundingClientRect();
-//         bullet.style.left = bulletPos.left + 5 + 'px';
-  
-//         if (bulletPos.right > window.innerWidth) {
-//           bullet.remove();
-//           bullets.splice(i, 1);
-//         }
-//       }
-//     }
-  
-//     function gameLoop() {
-//       updateBullets();
-//       requestAnimationFrame(gameLoop);
-//     }
-  
-//     gameLoop();
-//   });
-  
+// Функция для проверки столкновения игрока с монстром
+function checkCollision() {
+    if (playerX < monsterX + monsterWidth &&
+        playerX + playerWidth > monsterX &&
+        playerY < monsterY + monsterHeight &&
+        playerY + playerHeight > monsterY) {
+        gameRunning = false;
+        alert("Игра окончена!");
+    }
+}
