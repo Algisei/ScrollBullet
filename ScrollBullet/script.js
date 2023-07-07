@@ -3,18 +3,42 @@ var canvas;
 var canvasContext;
 var canvasWidth;
 var canvasHeight;
+
 var playerX;
 var playerY;
-var playerWidth = 25;
-var playerHeight = 25;
+var playerWidth = 20;
+var playerHeight = 20;
 var playerSpeed = 5; // Скорость движения игрока
 var playerVelocityX = 0; // Скорость перемещения по оси X
 var playerVelocityY = 0; // Скорость перемещения по оси Y
-var monsterX = 100;
-var monsterY = 100;
+
+var monsters = []; // Массив для хранения монстров
+var monCount = 10; // Задаём количество монстров
+var monsterX = 0;
+var monsterY = 0;
+var monsterSpeed = 2; // Скорость движения монстров
 var monsterWidth = 20;
 var monsterHeight = 20;
+// Переменные для хранения координат точки появления монстра
+var monsterSpawnX;
+var monsterSpawnY;
+
 var gameRunning = true;
+var isShooting = false; // Флаг для определения, происходит ли стрельба
+
+var keyActions = {
+    87: "up",    // W или стрелка вверх
+    38: "up",
+    83: "down",  // S или стрелка вниз
+    40: "down",
+    65: "left",  // A или стрелка влево
+    37: "left",
+    68: "right", // D или стрелка вправо
+    39: "right",
+    32: "shoot"  // Пробел (клавиша стрельбы)
+};
+
+
 
 // Функция для запуска игры
 window.onload = function() {
@@ -37,20 +61,11 @@ window.onload = function() {
     document.addEventListener("keyup", function(event) {
         handleKeyPress(event.keyCode, false);
     });
+
+    // Создание монстров
+    createMonsters(monCount);
 }
 
-// Функция для обновления игры
-function updateGame() {
-    if (gameRunning) {
-        movePlayer();
-        moveMonster();
-        checkCollision();
-        drawEverything();
-    } else {
-        // Остановка игры
-        clearInterval();
-    }
-}
 
 // Функция для установки размеров элементов
 function setElementSizes() {
@@ -66,21 +81,26 @@ function setElementSizes() {
 
 // Функция для обработки нажатия клавиш
 function handleKeyPress(keyCode, isKeyDown) {
-    // Вверх
-    if (keyCode === 87 || keyCode === 38) {
-        playerVelocityY = isKeyDown ? -1 : 0;
-    }
-    // Вниз
-    else if (keyCode === 83 || keyCode === 40) {
-        playerVelocityY = isKeyDown ? 1 : 0;
-    }
-    // Влево
-    else if (keyCode === 65 || keyCode === 37) {
-        playerVelocityX = isKeyDown ? -1 : 0;
-    }
-    // Вправо
-    else if (keyCode === 68 || keyCode === 39) {
-        playerVelocityX = isKeyDown ? 1 : 0;
+    var action = keyActions[keyCode];
+
+    switch (action) {
+        case "up":
+            playerVelocityY = isKeyDown ? -1 : 0;
+            break;
+        case "down":
+            playerVelocityY = isKeyDown ? 1 : 0;
+            break;
+        case "left":
+            playerVelocityX = isKeyDown ? -1 : 0;
+            break;
+        case "right":
+            playerVelocityX = isKeyDown ? 1 : 0;
+            break;
+        case "shoot":
+            isShooting = isKeyDown;
+            break;
+        default:
+            break;
     }
 }
 
@@ -90,7 +110,7 @@ function drawEverything() {
     canvasContext.fillStyle = "black";
     canvasContext.fillRect(0, 0, canvasWidth, canvasHeight);
 
-    // Отрисовка игрока
+   // Отрисовка игрока
 canvasContext.fillStyle = "blue";
 canvasContext.fillRect(playerX, playerY, playerWidth, playerHeight);
 
@@ -99,29 +119,33 @@ if (gameRunning) {
     // Проверка расстояния между игроком и монстром
     var distance = Math.sqrt(
         Math.pow(playerX - monsterX, 2) + Math.pow(playerY - monsterY, 2)
-    );
-    var minDistance = 100; // Минимальное расстояние от игрока до монстра
-
-    if (distance > minDistance) {
-        canvasContext.fillStyle = "red";
-        canvasContext.fillRect(monsterX, monsterY, monsterWidth, monsterHeight);
-    }
+    );    
+        // canvasContext.fillStyle = "red";
+        // canvasContext.fillRect(monsterX, monsterY, monsterWidth, monsterHeight);
+    
 }
-
+// Отрисовка монстров
+drawMonsters();
 // Отрисовка пуль
 drawBullets();
 }
-
 
 // Функция для обновления игры
 function updateGame() {
     if (gameRunning) {
         movePlayer();
-        moveMonster();
+         // Обновление движения монстров
+        moveMonsters();
         checkCollision();
-        updateBullets(); // Добавлено обновление пуль
+
+        // Создание пули при нажатии клавиши стрельбы
+        if (isShooting) {
+            createBullet();
+        }
+
+        updateBullets();
         drawEverything();
-        drawBullets(); // Добавлено отрисовка пуль
+        drawBullets();
     } else {
         // Остановка игры
         clearInterval();
@@ -147,29 +171,104 @@ function movePlayer() {
     }
 }
 
-// Функция для движения монстра к игроку
-function moveMonster() {
-    if (monsterX < playerX) {
-        monsterX += 2;
-    }
-    if (monsterX > playerX) {
-        monsterX -= 2;
-    }
-    if (monsterY < playerY) {
-        monsterY += 2;
-    }
-    if (monsterY > playerY) {
-        monsterY -= 2;
+// Функция для создания монстров
+function createMonsters(numMonsters) {
+    for (var i = 0; i < numMonsters; i++) {
+        var monster = {
+            x: Math.random() * (canvasWidth - monsterWidth),
+            y: Math.random() * (canvasHeight - monsterHeight),
+            speed: monsterSpeed
+        };
+        monsters.push(monster);
     }
 }
 
-// Функция для проверки столкновения игрока с монстром
-function checkCollision() {
-    if (playerX < monsterX + monsterWidth &&
-        playerX + playerWidth > monsterX &&
-        playerY < monsterY + monsterHeight &&
-        playerY + playerHeight > monsterY) {
-        gameRunning = false;
-        alert("Игра окончена!");
+// Функция для отрисовки монстров
+function drawMonsters() {
+    for (var i = 0; i < monsters.length; i++) {
+        var monster = monsters[i];
+        canvasContext.fillStyle = "red";
+        canvasContext.fillRect(monster.x, monster.y, monsterWidth, monsterHeight);
     }
 }
+
+// Функция для движения монстров
+function moveMonsters() {
+    for (var i = 0; i < monsters.length; i++) {
+        var monster = monsters[i];
+        if (monster.x < playerX) {
+            monster.x += monster.speed;
+        }
+        if (monster.x > playerX) {
+            monster.x -= monster.speed;
+        }
+        if (monster.y < playerY) {
+            monster.y += monster.speed;
+        }
+        if (monster.y > playerY) {
+            monster.y -= monster.speed;
+        }
+    }
+}
+
+
+
+// Функция для проверки столкновения игрока с монстрами
+function checkCollision() {
+    for (var i = 0; i < monsters.length; i++) {
+        var monster = monsters[i];
+        if (
+            playerX < monster.x + monsterWidth &&
+            playerX + playerWidth > monster.x &&
+            playerY < monster.y + monsterHeight &&
+            playerY + playerHeight > monster.y
+        ) {
+            gameRunning = false;
+            alert("Game over!");
+            break;
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// // Функция для движения монстра к игроку
+// function moveMonster() {
+//     if (monsterX < playerX) {
+//         monsterX += 2;
+//     }
+//     if (monsterX > playerX) {
+//         monsterX -= 2;
+//     }
+//     if (monsterY < playerY) {
+//         monsterY += 2;
+//     }
+//     if (monsterY > playerY) {
+//         monsterY -= 2;
+//     }
+// }
+
+// // Функция для проверки столкновения игрока с монстром
+// function checkCollision() {
+//     if (playerX < monsterX + monsterWidth &&
+//         playerX + playerWidth > monsterX &&
+//         playerY < monsterY + monsterHeight &&
+//         playerY + playerHeight > monsterY) {
+//         gameRunning = false;
+//         alert("Game over!");
+//     }
+// }
