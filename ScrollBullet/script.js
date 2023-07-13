@@ -1,30 +1,14 @@
-// Глобальные переменные
 var canvas;
 var canvasContext;
 var canvasWidth;
 var canvasHeight;
 
-var playerX;
-var playerY;
-var playerWidth = 20;
-var playerHeight = 20;
-var playerSpeed = 5; // Скорость движения игрока
-var playerVelocityX = 0; // Скорость перемещения по оси X
-var playerVelocityY = 0; // Скорость перемещения по оси Y
-
-var monsters = []; // Массив для хранения монстров
-var monCount = 10; // Задаём количество монстров
-var monsterX = 0;
-var monsterY = 0;
-var monsterSpeed = 2; // Скорость движения монстров
-var monsterWidth = 20;
-var monsterHeight = 20;
-// Переменные для хранения координат точки появления монстра
-var monsterSpawnX;
-var monsterSpawnY;
-
 var gameRunning = true;
+var isGamePaused = false; // Флаг для определения, находится ли игра на паузе
+
 var isShooting = false; // Флаг для определения, происходит ли стрельба
+
+var keyState = {}; // Объект для отслеживания состояния клавиш
 
 var keyActions = {
     87: "up",    // W или стрелка вверх
@@ -38,7 +22,11 @@ var keyActions = {
     32: "shoot"  // Пробел (клавиша стрельбы)
 };
 
+var bulletSizeBonusTime = 0;
+var bulletSizeBonusDuration = 10; // Длительность бонуса увеличения размера пули в секундах
 
+var bulletSpeedBonusTime = 0;
+var bulletSpeedBonusDuration = 10; // Длительность бонуса увеличения скорости пули в секундах
 
 // Функция для запуска игры
 window.onload = function() {
@@ -48,8 +36,8 @@ window.onload = function() {
     // Установка размеров элементов при загрузке страницы
     setElementSizes();
 
-    // Установка интервала для обновления игры
-    setInterval(updateGame, 1000/30);
+    // Обновление игры
+    setInterval(updateGame, 1000 / 30);
 
     // Обработчик изменения размера окна
     window.addEventListener("resize", setElementSizes);
@@ -64,8 +52,70 @@ window.onload = function() {
 
     // Создание монстров
     createMonsters(monCount);
+
+    // Создание бонусных шаров
+    createBonusShards();
 }
 
+// Функция для отображения окна паузы
+function showPauseWindow() {
+    // Создание элементов окна паузы (можно использовать свои CSS стили)
+    var pauseOverlay = document.createElement("div");
+    pauseOverlay.id = "pauseOverlay";
+    pauseOverlay.style.position = "absolute";
+    pauseOverlay.style.top = "0";
+    pauseOverlay.style.left = "0";
+    pauseOverlay.style.width = "100%";
+    pauseOverlay.style.height = "100%";
+    pauseOverlay.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+    pauseOverlay.style.display = "flex";
+    pauseOverlay.style.alignItems = "center";
+    pauseOverlay.style.justifyContent = "center";
+
+    var pauseMessage = document.createElement("p");
+    pauseMessage.textContent = "Game Paused";
+    pauseMessage.style.color = "white";
+    pauseMessage.style.fontSize = "24px";
+    pauseOverlay.appendChild(pauseMessage);
+
+    var resumeButton = document.createElement("button");
+    resumeButton.textContent = "Resume";
+    resumeButton.style.padding = "10px 20px";
+    resumeButton.style.fontSize = "18px";
+    resumeButton.style.backgroundColor = "blue";
+    resumeButton.style.color = "white";
+    resumeButton.style.border = "none";
+    resumeButton.style.cursor = "pointer";
+    resumeButton.style.marginTop = "20px";
+    resumeButton.addEventListener("click", function() {
+        closePauseWindow();
+        isGamePaused = false;
+    });
+    pauseOverlay.appendChild(resumeButton);
+
+    document.body.appendChild(pauseOverlay);
+}
+
+// Функция для закрытия окна паузы
+function closePauseWindow() {
+    var pauseOverlay = document.getElementById("pauseOverlay");
+    if (pauseOverlay) {
+        pauseOverlay.parentNode.removeChild(pauseOverlay);
+    }
+}
+
+// Обработчик нажатия клавиши для паузы
+document.addEventListener("keydown", function(event) {
+    if (event.keyCode === 27) { // Клавиша "ESC"
+        if (isGamePaused) {
+            closePauseWindow();
+            isGamePaused = false;
+        } else {
+            showPauseWindow();
+            isGamePaused = true;
+        }
+    }
+});
 
 // Функция для установки размеров элементов
 function setElementSizes() {
@@ -85,16 +135,16 @@ function handleKeyPress(keyCode, isKeyDown) {
 
     switch (action) {
         case "up":
-            playerVelocityY = isKeyDown ? -1 : 0;
+            keyState.up = isKeyDown;
             break;
         case "down":
-            playerVelocityY = isKeyDown ? 1 : 0;
+            keyState.down = isKeyDown;
             break;
         case "left":
-            playerVelocityX = isKeyDown ? -1 : 0;
+            keyState.left = isKeyDown;
             break;
         case "right":
-            playerVelocityX = isKeyDown ? 1 : 0;
+            keyState.right = isKeyDown;
             break;
         case "shoot":
             isShooting = isKeyDown;
@@ -104,41 +154,67 @@ function handleKeyPress(keyCode, isKeyDown) {
     }
 }
 
+// Функция для обновления состояния игрока на основе зажатых клавиш
+function updatePlayerState() {
+    if (keyState.up) {
+        playerVelocityY = -1;
+    } else if (keyState.down) {
+        playerVelocityY = 1;
+    } else {
+        playerVelocityY = 0;
+    }
+
+    if (keyState.left) {
+        playerVelocityX = -1;
+    } else if (keyState.right) {
+        playerVelocityX = 1;
+    } else {
+        playerVelocityX = 0;
+    }
+}
+
 // Функция для отрисовки игровых объектов
 function drawEverything() {
     // Очистка холста
     canvasContext.fillStyle = "black";
     canvasContext.fillRect(0, 0, canvasWidth, canvasHeight);
 
-   // Отрисовка игрока
-canvasContext.fillStyle = "blue";
-canvasContext.fillRect(playerX, playerY, playerWidth, playerHeight);
+    // Отрисовка игрока
+    canvasContext.fillStyle = "blue";
+    canvasContext.fillRect(playerX, playerY, playerWidth, playerHeight);
 
-// Отрисовка монстра, только если игра активна
-if (gameRunning) {
-    // Проверка расстояния между игроком и монстром
-    var distance = Math.sqrt(
-        Math.pow(playerX - monsterX, 2) + Math.pow(playerY - monsterY, 2)
-    );    
+    // Отрисовка монстров, только если игра активна
+    if (gameRunning) {
+        // Проверка расстояния между игроком и монстром
+        var distance = Math.sqrt(
+            Math.pow(playerX - monsterX, 2) + Math.pow(playerY - monsterY, 2)
+        );
         // canvasContext.fillStyle = "red";
         // canvasContext.fillRect(monsterX, monsterY, monsterWidth, monsterHeight);
-    
+    }
+
+    // Отрисовка монстров
+    drawMonsters();
+    // Отрисовка пуль
+    drawBullets();
+    // Отрисовка бонусов
+    drawBonusShards();
+    // Отрисовка таймеров бонусов
+    drawBonusTimers();
 }
-// Отрисовка монстров
-drawMonsters();
-// Отрисовка пуль
-drawBullets();
-}
+
+
 
 // Функция для обновления игры
 function updateGame() {
-    if (gameRunning) {
+    if (gameRunning && !isGamePaused) {
+        updatePlayerState();
         movePlayer();
-         // Обновление движения монстров
         moveMonsters();
-        checkCollision();
+        
+        checkBonusCollision();
+        checkBonusDuration();
 
-        // Создание пули при нажатии клавиши стрельбы
         if (isShooting) {
             createBullet();
         }
@@ -146,129 +222,11 @@ function updateGame() {
         updateBullets();
         drawEverything();
         drawBullets();
+        drawBonusShards();
+        drawBonusTimers(); // Вывод таймеров бонусов
+        updateBonusTimers(); // Обновление таймеров бонусов
+        checkCollision();
     } else {
-        // Остановка игры
         clearInterval();
     }
 }
-
-// Функция для движения игрока
-function movePlayer() {
-    playerX += playerVelocityX * playerSpeed;
-    playerY += playerVelocityY * playerSpeed;
-
-    // Ограничение движения игрока в пределах игрового поля
-    if (playerX < 0) {
-        playerX = 0;
-    } else if (playerX + playerWidth > canvasWidth) {
-        playerX = canvasWidth - playerWidth;
-    }
-
-    if (playerY < 0) {
-        playerY = 0;
-    } else if (playerY + playerHeight > canvasHeight) {
-        playerY = canvasHeight - playerHeight;
-    }
-}
-
-// Функция для создания монстров
-function createMonsters(numMonsters) {
-    for (var i = 0; i < numMonsters; i++) {
-        var monster = {
-            x: Math.random() * (canvasWidth - monsterWidth),
-            y: Math.random() * (canvasHeight - monsterHeight),
-            speed: monsterSpeed
-        };
-        monsters.push(monster);
-    }
-}
-
-// Функция для отрисовки монстров
-function drawMonsters() {
-    for (var i = 0; i < monsters.length; i++) {
-        var monster = monsters[i];
-        canvasContext.fillStyle = "red";
-        canvasContext.fillRect(monster.x, monster.y, monsterWidth, monsterHeight);
-    }
-}
-
-// Функция для движения монстров
-function moveMonsters() {
-    for (var i = 0; i < monsters.length; i++) {
-        var monster = monsters[i];
-        if (monster.x < playerX) {
-            monster.x += monster.speed;
-        }
-        if (monster.x > playerX) {
-            monster.x -= monster.speed;
-        }
-        if (monster.y < playerY) {
-            monster.y += monster.speed;
-        }
-        if (monster.y > playerY) {
-            monster.y -= monster.speed;
-        }
-    }
-}
-
-
-
-// Функция для проверки столкновения игрока с монстрами
-function checkCollision() {
-    for (var i = 0; i < monsters.length; i++) {
-        var monster = monsters[i];
-        if (
-            playerX < monster.x + monsterWidth &&
-            playerX + playerWidth > monster.x &&
-            playerY < monster.y + monsterHeight &&
-            playerY + playerHeight > monster.y
-        ) {
-            gameRunning = false;
-            alert("Game over!");
-            break;
-        }
-    }
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// // Функция для движения монстра к игроку
-// function moveMonster() {
-//     if (monsterX < playerX) {
-//         monsterX += 2;
-//     }
-//     if (monsterX > playerX) {
-//         monsterX -= 2;
-//     }
-//     if (monsterY < playerY) {
-//         monsterY += 2;
-//     }
-//     if (monsterY > playerY) {
-//         monsterY -= 2;
-//     }
-// }
-
-// // Функция для проверки столкновения игрока с монстром
-// function checkCollision() {
-//     if (playerX < monsterX + monsterWidth &&
-//         playerX + playerWidth > monsterX &&
-//         playerY < monsterY + monsterHeight &&
-//         playerY + playerHeight > monsterY) {
-//         gameRunning = false;
-//         alert("Game over!");
-//     }
-// }
